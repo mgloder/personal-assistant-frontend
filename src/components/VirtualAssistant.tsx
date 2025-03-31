@@ -60,34 +60,7 @@ const VirtualAssistant: React.FC<VirtualAssistantProps> = ({
           }}
         />
 
-        {/* Status indicators */}
-        <AnimatePresence>
-          {isTyping && (
-            <motion.div 
-              className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-            >
-              <motion.div 
-                className="w-1.5 h-1.5 bg-blue-500 rounded-full"
-                animate={{ y: [0, -4, 0] }}
-                transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
-              />
-              <motion.div 
-                className="w-1.5 h-1.5 bg-blue-500 rounded-full"
-                animate={{ y: [0, -4, 0] }}
-                transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
-              />
-              <motion.div 
-                className="w-1.5 h-1.5 bg-blue-500 rounded-full"
-                animate={{ y: [0, -4, 0] }}
-                transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {/* Listening indicator */}
         <AnimatePresence>
           {isListening && (
             <motion.div 
