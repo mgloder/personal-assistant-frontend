@@ -67,7 +67,9 @@ const Chat: React.FC = () => {
 
     try {
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
-        messages: [...messages, userMessage],
+        message: userMessage
+      }, {
+        withCredentials: true
       });
 
       const assistantMessage: Message = {
