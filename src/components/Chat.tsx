@@ -1,12 +1,16 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { MicrophoneIcon, StopIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import VirtualAssistant from './VirtualAssistant';
+import Navbar from './Navbar';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp: Date;
 }
 
 const Chat: React.FC = () => {
@@ -132,7 +136,12 @@ const Chat: React.FC = () => {
       return;
     }
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = {
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date()
+    };
+
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
@@ -166,6 +175,7 @@ const Chat: React.FC = () => {
       const assistantMessage: Message = {
         role: 'assistant',
         content: response.data.response,
+        timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantMessage]);
       setAssistantEmotion('happy');
@@ -191,6 +201,7 @@ const Chat: React.FC = () => {
       const errorMessageObj: Message = {
         role: 'assistant',
         content: errorMessage,
+        timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessageObj]);
       setAssistantEmotion('neutral');
@@ -202,17 +213,12 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <motion.div 
-      className="fixed inset-0 flex flex-col bg-white"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Safe area padding for mobile devices */}
-      <div className="flex-none h-[env(safe-area-inset-top)] bg-white" />
-      
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Navbar */}
+      <Navbar isTyping={isTyping} isListening={isRecording} />
+
       {/* Main chat container */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Connection status */}
         <AnimatePresence>
           {!isConnected && (
@@ -229,145 +235,128 @@ const Chat: React.FC = () => {
         </AnimatePresence>
         
         {/* Chat messages area */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 bg-gray-50">
-          <AnimatePresence>
-            {messages.map((message, index) => (
-              <motion.div
-                key={index}
-                className={`flex items-start gap-3 ${
-                  message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                }`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                {message.role === 'assistant' && (
-                  <div className="flex-shrink-0">
-                    <VirtualAssistant 
-                      isTyping={isTyping && index === messages.length - 1}
-                      isListening={isRecording}
-                      emotion={assistantEmotion}
-                    />
-                  </div>
-                )}
-                <motion.div
-                  className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-4 text-base ${
-                    message.role === 'user'
-                      ? 'bg-blue-500 text-white rounded-br-none'
-                      : message.content.includes('error') || message.content.includes('Error')
-                      ? 'bg-red-100 text-red-800 rounded-bl-none shadow-sm'
-                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
-                  }`}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {message.content}
-                </motion.div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          <AnimatePresence>
-            {isTyping && (
-              <motion.div 
-                className="flex items-start gap-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="flex-shrink-0">
-                  <VirtualAssistant isTyping={true} emotion="thinking" />
-                </div>
-                <motion.div 
-                  className="bg-white rounded-2xl rounded-bl-none p-4 shadow-sm"
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="flex space-x-2">
-                    <motion.div 
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -4, 0] }}
-                      transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
-                    />
-                    <motion.div 
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -4, 0] }}
-                      transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
-                    />
-                    <motion.div 
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                      animate={{ y: [0, -4, 0] }}
-                      transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
-                    />
-                  </div>
-                </motion.div>
-              </motion.div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-4">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-500 py-8">
+                Start a conversation with Little Dragon!
+              </div>
             )}
-          </AnimatePresence>
-          <div ref={messagesEndRef} />
+            <AnimatePresence>
+              {messages.map((message, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex items-start space-x-2 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    {message.role === 'assistant' && (
+                      <div className="flex-shrink-0">
+                        <VirtualAssistant 
+                          isTyping={isTyping && index === messages.length - 1}
+                          isListening={isRecording}
+                          emotion={assistantEmotion}
+                        />
+                      </div>
+                    )}
+                    <div className={`rounded-2xl px-4 py-2 ${
+                      message.role === 'user' 
+                        ? 'bg-blue-500 text-white' 
+                        : message.content.includes('error') || message.content.includes('Error')
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-white text-gray-800 shadow-sm'
+                    }`}>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <span className="text-xs opacity-70 mt-1 block">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="flex justify-center"
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <motion.div
+                        className="w-2 h-2 bg-gray-400 rounded-full"
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
+                      />
+                      <motion.div
+                        className="w-2 h-2 bg-gray-400 rounded-full"
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
+                      />
+                      <motion.div
+                        className="w-2 h-2 bg-gray-400 rounded-full"
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
+                      />
+                    </div>
+                    <span className="text-sm">Little Dragon is typing...</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
-        {/* Input area with safe area padding for mobile */}
-        <motion.div 
-          className="flex-none bg-white border-t"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="h-[env(safe-area-inset-bottom)] bg-white" />
-          <form onSubmit={handleSubmit} className="p-3 md:p-4">
-            <div className="flex gap-2 items-center">
-              <motion.input
+        {/* Input area */}
+        <div className="border-t border-gray-200 bg-white">
+          <div className="p-4">
+            <form onSubmit={handleSubmit} className="flex space-x-4">
+              <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 p-3 text-base border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!isConnected}
-                whileFocus={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
+                className="flex-1 rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!isConnected || isTyping}
               />
               <motion.button
-                type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`p-3 rounded-full ${
-                  isRecording
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                } ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
-                disabled={!isConnected}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                animate={isRecording ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.2 }}
-              >
-                {isRecording ? (
-                  <StopIcon className="h-6 w-6 text-white" />
-                ) : (
-                  <MicrophoneIcon className="h-6 w-6 text-gray-600" />
-                )}
-              </motion.button>
-              <motion.button
                 type="submit"
-                className={`p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 ${
-                  !isConnected ? 'opacity-50 cursor-not-allowed' : ''
+                disabled={!input.trim() || isTyping}
+                className={`px-6 py-2 rounded-full text-white font-medium ${
+                  !input.trim() || isTyping
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
                 }`}
-                disabled={!isConnected}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={{ duration: 0.2 }}
               >
-                <PaperAirplaneIcon className="h-6 w-6" />
+                Send
               </motion.button>
-            </div>
-          </form>
-        </motion.div>
+            </form>
+          </div>
+        </div>
       </div>
-    </motion.div>
+
+      {/* Error message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-4 left-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"
+          >
+            <p className="text-sm">{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
