@@ -12,8 +12,9 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Create .next directory if it doesn't exist
-RUN mkdir -p .next
+# Create a non-root user
+RUN adduser -D frontend && chown -R frontend:frontend /app
+USER frontend
 
 # Expose the port the app runs on
 EXPOSE 3001
