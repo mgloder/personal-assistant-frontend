@@ -160,7 +160,7 @@ const Chat: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 10000
+        timeout: 20000
       });
 
       console.log('Received response:', response.data);
