@@ -23,6 +23,7 @@ const Chat: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [assistantEmotion, setAssistantEmotion] = useState<'happy' | 'thinking' | 'listening' | 'neutral'>('neutral');
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -46,6 +47,10 @@ const Chat: React.FC = () => {
         if (response.data && response.data.message) {
           setIsConnected(true);
           setError(null);
+          // Store the session ID from the initial connection
+          if (response.data.session_id) {
+            setSessionId(response.data.session_id);
+          }
         } else {
           throw new Error('Invalid response format');
         }
@@ -135,9 +140,10 @@ const Chat: React.FC = () => {
           setAssistantEmotion('thinking');
           setError(null);
 
-          // Send the message to the API
+          // Send the message to the API with session ID
           axios.post('/api/chat', {
-            message: userMessage
+            message: userMessage,
+            session_id: sessionId
           }, {
             headers: {
               'Content-Type': 'application/json',
@@ -147,6 +153,11 @@ const Chat: React.FC = () => {
           .then(response => {
             if (!response.data || !response.data.response) {
               throw new Error('Invalid response format from server');
+            }
+
+            // Update session ID if provided in response
+            if (response.data.session_id) {
+              setSessionId(response.data.session_id);
             }
 
             const assistantMessage: Message = {
@@ -192,7 +203,7 @@ const Chat: React.FC = () => {
         }
       };
     }
-  }, [selectedLanguage]);
+  }, [selectedLanguage, sessionId]);
 
   const startRecording = () => {
     const recognition = recognitionRef.current;
@@ -411,7 +422,8 @@ const Chat: React.FC = () => {
                     setError(null);
 
                     axios.post('/api/chat', {
-                      message: userMessage
+                      message: userMessage,
+                      session_id: sessionId
                     }, {
                       headers: {
                         'Content-Type': 'application/json',
@@ -421,6 +433,11 @@ const Chat: React.FC = () => {
                     .then(response => {
                       if (!response.data || !response.data.response) {
                         throw new Error('Invalid response format from server');
+                      }
+
+                      // Update session ID if provided in response
+                      if (response.data.session_id) {
+                        setSessionId(response.data.session_id);
                       }
 
                       const assistantMessage: Message = {
