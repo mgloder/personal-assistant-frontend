@@ -6,6 +6,7 @@ import { MicrophoneIcon, StopIcon, PaperAirplaneIcon } from '@heroicons/react/24
 import { motion, AnimatePresence } from 'framer-motion';
 import VirtualAssistant from './VirtualAssistant';
 import Navbar from './Navbar';
+import { SUPPORTED_LANGUAGES } from './Navbar';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,6 +22,7 @@ const Chat: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [assistantEmotion, setAssistantEmotion] = useState<'happy' | 'thinking' | 'listening' | 'neutral'>('neutral');
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -86,6 +88,7 @@ const Chat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition;
@@ -94,6 +97,7 @@ const Chat: React.FC = () => {
       
       recognition.continuous = true;
       recognition.interimResults = true;
+      recognition.lang = selectedLanguage;
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
@@ -107,7 +111,7 @@ const Chat: React.FC = () => {
         setIsRecording(false);
       };
     }
-  }, []);
+  }, [selectedLanguage]); // Reinitialize when language changes
 
   const startRecording = () => {
     const recognition = recognitionRef.current;
@@ -211,7 +215,12 @@ const Chat: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
-      <Navbar isTyping={isTyping} isListening={isRecording} />
+      <Navbar 
+        isTyping={isTyping} 
+        isListening={isRecording} 
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={setSelectedLanguage}
+      />
 
       {/* Main chat container */}
       <div className="flex-1 flex flex-col min-h-0">
@@ -317,23 +326,46 @@ const Chat: React.FC = () => {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
+                placeholder={isRecording ? "Listening..." : "Type your message..."}
                 className="flex-1 rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!isConnected || isTyping}
+                disabled={!isConnected || isTyping || isRecording}
               />
-              <motion.button
-                type="submit"
-                disabled={!input.trim() || isTyping}
-                className={`px-6 py-2 rounded-full text-white font-medium ${
-                  !input.trim() || isTyping
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Send
-              </motion.button>
+              <div className="flex space-x-2">
+                <motion.button
+                  type="button"
+                  onMouseDown={startRecording}
+                  onMouseUp={stopRecording}
+                  onTouchStart={startRecording}
+                  onTouchEnd={stopRecording}
+                  disabled={!isConnected || isTyping}
+                  className={`p-2 rounded-full ${
+                    isRecording 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {isRecording ? (
+                    <StopIcon className="h-5 w-5" />
+                  ) : (
+                    <MicrophoneIcon className="h-5 w-5" />
+                  )}
+                </motion.button>
+                <motion.button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className={`px-6 py-2 rounded-full text-white font-medium ${
+                    !input.trim() || isTyping
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <PaperAirplaneIcon className="h-5 w-5" />
+                </motion.button>
+              </div>
             </form>
           </div>
         </div>
