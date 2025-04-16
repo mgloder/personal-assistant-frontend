@@ -368,6 +368,7 @@ const Chat: React.FC = () => {
                       onMouseUp={stopRecording}
                       onTouchStart={startRecording}
                       onTouchEnd={stopRecording}
+                      onContextMenu={(e) => e.preventDefault()}
                       className="relative w-full h-16 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white flex flex-row items-center justify-center space-x-4 shadow-md hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all duration-200 active:from-blue-400 active:to-blue-500"
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
