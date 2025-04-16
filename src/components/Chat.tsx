@@ -99,23 +99,105 @@ const Chat: React.FC = () => {
       recognition.interimResults = true;
       recognition.lang = selectedLanguage;
 
+      let finalTranscript = '';
+
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-        setInput(transcript);
+        let interimTranscript = '';
+        
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        setInput(finalTranscript || interimTranscript);
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
       };
+
+      recognition.onend = () => {
+        if (finalTranscript.trim()) {
+          const userMessage: Message = {
+            role: 'user',
+            content: finalTranscript.trim(),
+            timestamp: new Date()
+          };
+
+          setMessages(prev => [...prev, userMessage]);
+          setInput('');
+          setIsTyping(true);
+          setAssistantEmotion('thinking');
+          setError(null);
+
+          // Send the message to the API
+          axios.post('/api/chat', {
+            message: userMessage
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 20000
+          })
+          .then(response => {
+            if (!response.data || !response.data.response) {
+              throw new Error('Invalid response format from server');
+            }
+
+            const assistantMessage: Message = {
+              role: 'assistant',
+              content: response.data.response,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+            setAssistantEmotion('happy');
+          })
+          .catch(error => {
+            console.error('Error details:', error);
+            let errorMessage = 'Failed to get response from assistant';
+            
+            if (axios.isAxiosError(error)) {
+              if (error.response) {
+                errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+              } else if (error.request) {
+                errorMessage = 'No response received from server. Please check if the server is running and accessible.';
+              } else if (error.code === 'ECONNABORTED') {
+                errorMessage = 'Request timed out. Please check your connection and try again.';
+              } else if (error.code === 'ECONNREFUSED') {
+                errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
+              } else {
+                errorMessage = `Request error: ${error.message}`;
+              }
+            }
+            
+            setError(errorMessage);
+            const errorMessageObj: Message = {
+              role: 'assistant',
+              content: errorMessage,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMessageObj]);
+            setAssistantEmotion('neutral');
+          })
+          .finally(() => {
+            setIsTyping(false);
+            setTimeout(() => setAssistantEmotion('neutral'), 2000);
+            finalTranscript = ''; // Clear the final transcript after sending
+          });
+        }
+      };
     }
-  }, [selectedLanguage]); // Reinitialize when language changes
+  }, [selectedLanguage]);
 
   const startRecording = () => {
     const recognition = recognitionRef.current;
     if (recognition) {
+      setInput(''); // Clear any previous input
       recognition.start();
       setIsRecording(true);
     }
@@ -129,95 +211,12 @@ const Chat: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    if (!isConnected) {
-      setError('Not connected to server. Please check your connection and try again.');
-      return;
-    }
-
-    const userMessage: Message = {
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsTyping(true);
-    setAssistantEmotion('thinking');
-    setError(null);
-
-    try {
-      console.log('Sending request to:', '/api/chat');
-      console.log('Request payload:', { message: userMessage });
-
-      const response = await axios.post('/api/chat', {
-        message: userMessage
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 20000
-      });
-
-      console.log('Received response:', response.data);
-
-      if (!response.data || !response.data.response) {
-        throw new Error('Invalid response format from server');
-      }
-
-      // Simulate typing delay for more natural feel
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: response.data.response,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setAssistantEmotion('happy');
-    } catch (error) {
-      console.error('Error details:', error);
-      let errorMessage = 'Failed to get response from assistant';
-      
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
-        } else if (error.request) {
-          errorMessage = 'No response received from server. Please check if the server is running and accessible.';
-        } else if (error.code === 'ECONNABORTED') {
-          errorMessage = 'Request timed out. Please check your connection and try again.';
-        } else if (error.code === 'ECONNREFUSED') {
-          errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
-        } else {
-          errorMessage = `Request error: ${error.message}`;
-        }
-      }
-      
-      setError(errorMessage);
-      const errorMessageObj: Message = {
-        role: 'assistant',
-        content: errorMessage,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessageObj]);
-      setAssistantEmotion('neutral');
-    } finally {
-      setIsTyping(false);
-      // Reset emotion after a delay
-      setTimeout(() => setAssistantEmotion('neutral'), 2000);
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
       <Navbar 
         isTyping={isTyping} 
-        isListening={isRecording} 
+        isListening={false} 
         selectedLanguage={selectedLanguage}
         onLanguageChange={setSelectedLanguage}
       />
@@ -261,7 +260,7 @@ const Chat: React.FC = () => {
                       <div className="flex-shrink-0">
                         <VirtualAssistant 
                           isTyping={isTyping && index === messages.length - 1}
-                          isListening={isRecording}
+                          isListening={false}
                           emotion={assistantEmotion}
                         />
                       </div>
@@ -321,52 +320,187 @@ const Chat: React.FC = () => {
         {/* Input area */}
         <div className="border-t border-gray-200 bg-white">
           <div className="p-4">
-            <form onSubmit={handleSubmit} className="flex space-x-4">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={isRecording ? "Listening..." : "Type your message..."}
-                className="flex-1 rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!isConnected || isTyping || isRecording}
-              />
-              <div className="flex space-x-2">
-                <motion.button
-                  type="button"
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
-                  disabled={!isConnected || isTyping}
-                  className={`p-2 rounded-full ${
-                    isRecording 
-                      ? 'bg-red-500 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+            <AnimatePresence mode="wait">
+              {isRecording ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex flex-col items-center justify-center space-y-4 w-full max-w-4xl mx-auto"
                 >
-                  {isRecording ? (
-                    <StopIcon className="h-5 w-5" />
-                  ) : (
-                    <MicrophoneIcon className="h-5 w-5" />
-                  )}
-                </motion.button>
-                <motion.button
-                  type="submit"
-                  disabled={!input.trim() || isTyping}
-                  className={`px-6 py-2 rounded-full text-white font-medium ${
-                    !input.trim() || isTyping
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  <motion.div
+                    className="relative w-full"
+                    animate={{
+                      scale: [1, 1.01, 1],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <motion.div
+                      className="absolute inset-0 rounded-lg bg-blue-500/5"
+                      animate={{
+                        scale: [1, 1.05],
+                        opacity: [0.2, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeOut"
+                      }}
+                    />
+                    <motion.button
+                      type="button"
+                      onMouseDown={startRecording}
+                      onMouseUp={stopRecording}
+                      onTouchStart={startRecording}
+                      onTouchEnd={stopRecording}
+                      className="relative w-full h-16 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white flex flex-row items-center justify-center space-x-4 shadow-md hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all duration-200 active:from-blue-400 active:to-blue-500"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.05, 1],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <MicrophoneIcon className="h-6 w-6" />
+                      </motion.div>
+                      <span className="text-base font-medium">Hold to Speak</span>
+                    </motion.button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-sm text-gray-500"
+                  >
+                    Release to send message
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <motion.form
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!input.trim()) return;
+
+                    if (!isConnected) {
+                      setError('Not connected to server. Please check your connection and try again.');
+                      return;
+                    }
+
+                    const userMessage: Message = {
+                      role: 'user',
+                      content: input.trim(),
+                      timestamp: new Date()
+                    };
+
+                    setMessages(prev => [...prev, userMessage]);
+                    setInput('');
+                    setIsTyping(true);
+                    setAssistantEmotion('thinking');
+                    setError(null);
+
+                    axios.post('/api/chat', {
+                      message: userMessage
+                    }, {
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      timeout: 20000
+                    })
+                    .then(response => {
+                      if (!response.data || !response.data.response) {
+                        throw new Error('Invalid response format from server');
+                      }
+
+                      const assistantMessage: Message = {
+                        role: 'assistant',
+                        content: response.data.response,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [...prev, assistantMessage]);
+                      setAssistantEmotion('happy');
+                    })
+                    .catch(error => {
+                      console.error('Error details:', error);
+                      let errorMessage = 'Failed to get response from assistant';
+                      
+                      if (axios.isAxiosError(error)) {
+                        if (error.response) {
+                          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+                        } else if (error.request) {
+                          errorMessage = 'No response received from server. Please check if the server is running and accessible.';
+                        } else if (error.code === 'ECONNABORTED') {
+                          errorMessage = 'Request timed out. Please check your connection and try again.';
+                        } else if (error.code === 'ECONNREFUSED') {
+                          errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
+                        } else {
+                          errorMessage = `Request error: ${error.message}`;
+                        }
+                      }
+                      
+                      setError(errorMessage);
+                      const errorMessageObj: Message = {
+                        role: 'assistant',
+                        content: errorMessage,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [...prev, errorMessageObj]);
+                      setAssistantEmotion('neutral');
+                    })
+                    .finally(() => {
+                      setIsTyping(false);
+                      setTimeout(() => setAssistantEmotion('neutral'), 2000);
+                    });
+                  }}
+                  className="flex space-x-4"
                 >
-                  <PaperAirplaneIcon className="h-5 w-5" />
-                </motion.button>
-              </div>
-            </form>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1 rounded-full px-4 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={!isConnected || isTyping}
+                  />
+                  <div className="flex space-x-2">
+                    <motion.button
+                      type="button"
+                      onClick={() => setIsRecording(true)}
+                      disabled={!isConnected || isTyping}
+                      className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <MicrophoneIcon className="h-5 w-5" />
+                    </motion.button>
+                    <motion.button
+                      type="submit"
+                      disabled={!input.trim() || isTyping}
+                      className={`px-6 py-2 rounded-full text-white font-medium ${
+                        !input.trim() || isTyping
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-blue-500 hover:bg-blue-600'
+                      }`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <PaperAirplaneIcon className="h-5 w-5" />
+                    </motion.button>
+                  </div>
+                </motion.form>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
