@@ -28,18 +28,16 @@ const Chat: React.FC = () => {
   useEffect(() => {
     const testConnection = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        console.log('Testing connection to:', apiUrl);
+        console.log('Testing connection to:', '/api');
         console.log('Current window location:', window.location.href);
         
-        // Try to connect to the root endpoint for health check
-        console.log('Making request to:', `${apiUrl}/`);
-        const response = await axios.get(`${apiUrl}/`, {
-          timeout: 5000,
+        // Try to connect to the API endpoint for health check
+        console.log('Making request to:', '/api');
+        const response = await axios.get('/api', {
+          timeout: 10000,
           headers: {
             'Content-Type': 'application/json',
-          },
-          withCredentials: true
+          }
         });
         
         console.log('Connection test response:', response.data);
@@ -149,14 +147,12 @@ const Chat: React.FC = () => {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      console.log('Sending request to:', `${apiUrl}/chat`);
+      console.log('Sending request to:', '/api/chat');
       console.log('Request payload:', { message: userMessage });
 
-      const response = await axios.post(`${apiUrl}/chat`, {
+      const response = await axios.post('/api/chat', {
         message: userMessage
       }, {
-        withCredentials: true,
         headers: {
           'Content-Type': 'application/json',
         },

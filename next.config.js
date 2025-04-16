@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://192.168.31.132:8005/:path*',
+        destination: 'http://backend:8005/api/:path*',
       },
     ];
   },
@@ -23,6 +23,7 @@ const nextConfig = {
       },
     ];
   },
+  output: 'standalone',
 }
 
 module.exports = nextConfig 
