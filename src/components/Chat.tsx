@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { MicrophoneIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import VirtualAssistant from './VirtualAssistant';
 import Navbar from './Navbar';
 import Login from './Login';
+import { post, get, getAuthToken, API, LoginResponse, ChatResponse, HealthResponse } from '@/utils/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -32,11 +32,11 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
   const handleLogin = async (email: string, password: string): Promise<boolean> => {
     try {
       // Call the authentication API
-      const response = await axios.post('/api/auth/login', { email, password });
+      const response = await post<LoginResponse>(API.auth.login, { email, password });
       
-      if (response.data && response.data.token) {
+      if (response && response.token) {
         // Store the token in localStorage
-        localStorage.setItem('access_token', response.data.token);
+        localStorage.setItem('access_token', response.token);
         
         // Set authentication state
         setIsAuthenticated(true);
@@ -56,7 +56,7 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = getAccessToken();
+      const token = getAuthToken();
       if (token) {
         setIsAuthenticated(true);
         // Test the connection with the token
@@ -70,47 +70,17 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     checkAuth();
   }, []);
 
-  const getAccessToken = () => {
-    console.log('Getting access token...');
-    
-    // First check cookies
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.startsWith('access_token=')) {
-        const token = cookie.substring('access_token='.length);
-        console.log('Token found in cookies');
-        return token;
-      }
-    }
-    
-    // Then check localStorage
-    const storedToken = localStorage.getItem('access_token');
-    if (storedToken) {
-      console.log('Token found in localStorage');
-      return storedToken;
-    }
-    
-    console.log('No token found in cookies or localStorage');
-    return null;
-  };
-
   const testConnection = async () => {
     try {
-      const token = getAccessToken();
+      const token = getAuthToken();
       if (!token) {
         setIsConnected(false);
         return;
       }
 
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005';
-      const response = await fetch(`${backendUrl}/api/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
+      const response = await get<HealthResponse>(API.health);
+      
+      if (response) {
         setIsConnected(true);
         setError(null);
       } else {
@@ -179,29 +149,18 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
           setAssistantEmotion('thinking');
           setError(null);
 
-          // Get the access token
-          const token = getAccessToken();
-          console.log('Sending message with token:', token);
-
           // Send the message to the API
-          axios.post('/api/chat', {
+          post<ChatResponse>(API.chat.send, {
             message: userMessage
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            timeout: 20000
           })
           .then(response => {
-            if (!response.data || !response.data.message) {
+            if (!response || !response.message) {
               throw new Error('Invalid response format from server');
             }
 
             const assistantMessage: Message = {
               role: 'assistant',
-              content: response.data.message,
+              content: response.message,
               timestamp: new Date()
             };
             setMessages(prev => [...prev, assistantMessage]);
@@ -209,26 +168,10 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
           })
           .catch(error => {
             console.error('Error details:', error);
-            let errorMessage = 'Failed to get response from assistant';
-            
-            if (axios.isAxiosError(error)) {
-              if (error.response) {
-                errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
-              } else if (error.request) {
-                errorMessage = 'No response received from server. Please check if the server is running and accessible.';
-              } else if (error.code === 'ECONNABORTED') {
-                errorMessage = 'Request timed out. Please check your connection and try again.';
-              } else if (error.code === 'ECONNREFUSED') {
-                errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
-              } else {
-                errorMessage = `Request error: ${error.message}`;
-              }
-            }
-            
-            setError(errorMessage);
+            setError(error.message || 'Failed to get response from assistant');
             const errorMessageObj: Message = {
               role: 'assistant',
-              content: errorMessage,
+              content: error.message || 'Failed to get response from assistant',
               timestamp: new Date()
             };
             setMessages(prev => [...prev, errorMessageObj]);
@@ -265,7 +208,7 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const token = getAccessToken();
+    const token = getAuthToken();
     if (!token) {
       console.error('No authentication token found');
       setError('No authentication token found. Please log in.');
@@ -285,51 +228,27 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     setError(null);
 
     try {
-      console.log('Sending message with token:', token);
-      const response = await axios.post('/api/chat', {
+      const response = await post<ChatResponse>(API.chat.send, {
         message: userMessage
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        timeout: 20000
       });
 
-      if (!response.data || !response.data.message) {
+      if (!response || !response.message) {
         throw new Error('Invalid response format from server');
       }
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: response.data.message,
+        content: response.message,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantMessage]);
       setAssistantEmotion('happy');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error details:', error);
-      let errorMessage = 'Failed to get response from assistant';
-      
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
-        } else if (error.request) {
-          errorMessage = 'No response received from server. Please check if the server is running and accessible.';
-        } else if (error.code === 'ECONNABORTED') {
-          errorMessage = 'Request timed out. Please check your connection and try again.';
-        } else if (error.code === 'ECONNREFUSED') {
-          errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
-        } else {
-          errorMessage = `Request error: ${error.message}`;
-        }
-      }
-      
-      setError(errorMessage);
+      setError(error.message || 'Failed to get response from assistant');
       const errorMessageObj: Message = {
         role: 'assistant',
-        content: errorMessage,
+        content: error.message || 'Failed to get response from assistant',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessageObj]);
