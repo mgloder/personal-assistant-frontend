@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getAuthToken } from '@/utils/api';
 
 /**
  * Custom hook for client-side authentication
@@ -15,11 +16,8 @@ export function useAuth() {
   useEffect(() => {
     // Check if the access token exists in cookies
     const checkAuth = () => {
-      const cookies = document.cookie.split(';');
-      const hasToken = cookies.some(cookie => 
-        cookie.trim().startsWith('access_token=')
-      );
-      setIsAuthenticated(hasToken);
+      const token = getAuthToken();
+      setIsAuthenticated(!!token);
       setIsLoading(false);
     };
 
@@ -31,22 +29,41 @@ export function useAuth() {
    */
   const logout = async () => {
     try {
-      // Call the logout API endpoint to clear the cookie server-side
-      await fetch('/auth/logout', {
+      const token = getAuthToken();
+      if (!token) {
+        setIsAuthenticated(false);
+        router.push('/');
+        return;
+      }
+
+      // Call the logout API endpoint to blacklist the token
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
+
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
       
-      // Also clear the cookie client-side as a fallback
+      // Clear the cookie client-side
       document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      localStorage.removeItem('access_token');
       
-      // Update state and redirect
+      // Update state and redirect to root page
       setIsAuthenticated(false);
-      router.push('/auth/login');
+      router.push('/');
     } catch (error) {
       console.error('Logout error:', error);
-      // Still try to redirect even if there's an error
-      router.push('/auth/login');
+      // Still try to clear local auth state and redirect even if the server call fails
+      document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      localStorage.removeItem('access_token');
+      setIsAuthenticated(false);
+      router.push('/');
     }
   };
 
