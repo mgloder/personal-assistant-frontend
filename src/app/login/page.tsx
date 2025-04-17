@@ -27,30 +27,37 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005';
+      const response = await fetch(`${backendUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Get the redirect URL from query parameters or use default
-        const redirectPath = searchParams?.get('redirect') || '/';
+        // Store the token in localStorage
+        localStorage.setItem('access_token', data.access_token);
         
-        // Ensure the redirect path starts with a forward slash
-        const normalizedPath = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`;
+        // Set the token in an HTTP-only cookie
+        document.cookie = `access_token=${data.access_token}; path=/; secure; samesite=strict`;
         
-        // Use replace instead of push to prevent back button from returning to login
-        router.replace(normalizedPath);
+        // Get the redirect URL from search params or default to home
+        const redirectTo = searchParams?.get('redirect') || '/';
+        router.replace(redirectTo);
       } else {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      setError('An error occurred during login');
+      console.error('Login error details:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError(err instanceof Error ? err.message : 'An error occurred during login');
     } finally {
       setIsLoading(false);
     }

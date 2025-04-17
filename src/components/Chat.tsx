@@ -2,11 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { MicrophoneIcon, StopIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { MicrophoneIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import VirtualAssistant from './VirtualAssistant';
 import Navbar from './Navbar';
-import { SUPPORTED_LANGUAGES } from './Navbar';
+import Login from './Login';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,69 +21,106 @@ const Chat: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [assistantEmotion, setAssistantEmotion] = useState<'happy' | 'thinking' | 'listening' | 'neutral'>('neutral');
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Test API connection on component mount
+  const handleLogin = async (email: string, password: string): Promise<boolean> => {
+    try {
+      // Call the authentication API
+      const response = await axios.post('/api/auth/login', { email, password });
+      
+      if (response.data && response.data.token) {
+        // Store the token in localStorage
+        localStorage.setItem('access_token', response.data.token);
+        
+        // Set authentication state
+        setIsAuthenticated(true);
+        
+        // Test the connection with the new token
+        await testConnection();
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
-    const testConnection = async () => {
-      try {
-        console.log('Testing connection to:', '/api');
-        console.log('Current window location:', window.location.href);
-        
-        // Try to connect to the API endpoint for health check
-        console.log('Making request to:', '/api');
-        const response = await axios.get('/api', {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        console.log('Connection test response:', response.data);
-        if (response.data && response.data.message) {
-          setIsConnected(true);
-          setError(null);
-          // Store the session ID from the initial connection
-          if (response.data.session_id) {
-            setSessionId(response.data.session_id);
-          }
-        } else {
-          throw new Error('Invalid response format');
-        }
-      } catch (error) {
-        console.error('Connection test failed:', error);
+    const checkAuth = async () => {
+      const token = getAccessToken();
+      if (token) {
+        setIsAuthenticated(true);
+        // Test the connection with the token
+        await testConnection();
+      } else {
+        setIsAuthenticated(false);
         setIsConnected(false);
-        if (axios.isAxiosError(error)) {
-          console.error('Axios error details:', {
-            code: error.code,
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-            headers: error.response?.headers,
-          });
-          if (error.code === 'ECONNREFUSED') {
-            setError('Cannot connect to server. Please make sure the backend server is running on port 8005.');
-          } else if (error.code === 'ECONNABORTED') {
-            setError('Connection timed out. Please check your network connection.');
-          } else if (error.response) {
-            setError(`Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`);
-          } else if (error.request) {
-            setError('No response received from server. Please check if the server is running and accessible.');
-          } else {
-            setError(`Connection error: ${error.message}`);
-          }
-        } else {
-          setError('Unable to connect to the server. Please check if the server is running.');
-        }
       }
     };
-
-    testConnection();
+    
+    checkAuth();
   }, []);
+
+  const getAccessToken = () => {
+    console.log('Getting access token...');
+    
+    // First check cookies
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.startsWith('access_token=')) {
+        const token = cookie.substring('access_token='.length);
+        console.log('Token found in cookies');
+        return token;
+      }
+    }
+    
+    // Then check localStorage
+    const storedToken = localStorage.getItem('access_token');
+    if (storedToken) {
+      console.log('Token found in localStorage');
+      return storedToken;
+    }
+    
+    console.log('No token found in cookies or localStorage');
+    return null;
+  };
+
+  const testConnection = async () => {
+    try {
+      const token = getAccessToken();
+      if (!token) {
+        setIsConnected(false);
+        return;
+      }
+
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005';
+      const response = await fetch(`${backendUrl}/api/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setIsConnected(true);
+        setError(null);
+      } else {
+        setIsConnected(false);
+        setError('Failed to connect to the server');
+      }
+    } catch (err) {
+      console.error('Connection test error:', err);
+      setIsConnected(false);
+      setError('Failed to connect to the server');
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,29 +177,29 @@ const Chat: React.FC = () => {
           setAssistantEmotion('thinking');
           setError(null);
 
-          // Send the message to the API with session ID
+          // Get the access token
+          const token = getAccessToken();
+          console.log('Sending message with token:', token);
+
+          // Send the message to the API
           axios.post('/api/chat', {
-            message: userMessage,
-            session_id: sessionId
+            message: userMessage
           }, {
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
             },
             timeout: 20000
           })
           .then(response => {
-            if (!response.data || !response.data.response) {
+            if (!response.data || !response.data.message) {
               throw new Error('Invalid response format from server');
-            }
-
-            // Update session ID if provided in response
-            if (response.data.session_id) {
-              setSessionId(response.data.session_id);
             }
 
             const assistantMessage: Message = {
               role: 'assistant',
-              content: response.data.response,
+              content: response.data.message,
               timestamp: new Date()
             };
             setMessages(prev => [...prev, assistantMessage]);
@@ -203,7 +240,7 @@ const Chat: React.FC = () => {
         }
       };
     }
-  }, [selectedLanguage, sessionId]);
+  }, [selectedLanguage]);
 
   const startRecording = () => {
     const recognition = recognitionRef.current;
@@ -221,6 +258,91 @@ const Chat: React.FC = () => {
       setIsRecording(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const token = getAccessToken();
+    if (!token) {
+      console.error('No authentication token found');
+      setError('No authentication token found. Please log in.');
+      return;
+    }
+
+    const userMessage: Message = {
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsTyping(true);
+    setAssistantEmotion('thinking');
+    setError(null);
+
+    try {
+      console.log('Sending message with token:', token);
+      const response = await axios.post('/api/chat', {
+        message: userMessage
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 20000
+      });
+
+      if (!response.data || !response.data.message) {
+        throw new Error('Invalid response format from server');
+      }
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: response.data.message,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setAssistantEmotion('happy');
+    } catch (error) {
+      console.error('Error details:', error);
+      let errorMessage = 'Failed to get response from assistant';
+      
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
+        } else if (error.request) {
+          errorMessage = 'No response received from server. Please check if the server is running and accessible.';
+        } else if (error.code === 'ECONNABORTED') {
+          errorMessage = 'Request timed out. Please check your connection and try again.';
+        } else if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
+        } else {
+          errorMessage = `Request error: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
+      const errorMessageObj: Message = {
+        role: 'assistant',
+        content: errorMessage,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessageObj]);
+      setAssistantEmotion('neutral');
+    } finally {
+      setIsTyping(false);
+      setTimeout(() => setAssistantEmotion('neutral'), 2000);
+    }
+  };
+
+  if (!isAuthenticated) {
+    console.log('Not authenticated');
+    return <Login onLogin={handleLogin} />;
+  }
+  console.log('default');
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -401,86 +523,7 @@ const Chat: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!input.trim()) return;
-
-                    if (!isConnected) {
-                      setError('Not connected to server. Please check your connection and try again.');
-                      return;
-                    }
-
-                    const userMessage: Message = {
-                      role: 'user',
-                      content: input.trim(),
-                      timestamp: new Date()
-                    };
-
-                    setMessages(prev => [...prev, userMessage]);
-                    setInput('');
-                    setIsTyping(true);
-                    setAssistantEmotion('thinking');
-                    setError(null);
-
-                    axios.post('/api/chat', {
-                      message: userMessage,
-                      session_id: sessionId
-                    }, {
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      timeout: 20000
-                    })
-                    .then(response => {
-                      if (!response.data || !response.data.response) {
-                        throw new Error('Invalid response format from server');
-                      }
-
-                      // Update session ID if provided in response
-                      if (response.data.session_id) {
-                        setSessionId(response.data.session_id);
-                      }
-
-                      const assistantMessage: Message = {
-                        role: 'assistant',
-                        content: response.data.response,
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [...prev, assistantMessage]);
-                      setAssistantEmotion('happy');
-                    })
-                    .catch(error => {
-                      console.error('Error details:', error);
-                      let errorMessage = 'Failed to get response from assistant';
-                      
-                      if (axios.isAxiosError(error)) {
-                        if (error.response) {
-                          errorMessage = `Server error: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`;
-                        } else if (error.request) {
-                          errorMessage = 'No response received from server. Please check if the server is running and accessible.';
-                        } else if (error.code === 'ECONNABORTED') {
-                          errorMessage = 'Request timed out. Please check your connection and try again.';
-                        } else if (error.code === 'ECONNREFUSED') {
-                          errorMessage = 'Cannot connect to server. Please make sure the backend server is running on port 8005.';
-                        } else {
-                          errorMessage = `Request error: ${error.message}`;
-                        }
-                      }
-                      
-                      setError(errorMessage);
-                      const errorMessageObj: Message = {
-                        role: 'assistant',
-                        content: errorMessage,
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [...prev, errorMessageObj]);
-                      setAssistantEmotion('neutral');
-                    })
-                    .finally(() => {
-                      setIsTyping(false);
-                      setTimeout(() => setAssistantEmotion('neutral'), 2000);
-                    });
-                  }}
+                  onSubmit={handleSubmit}
                   className="flex space-x-4"
                 >
                   <input

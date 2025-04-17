@@ -32,7 +32,7 @@ export function useAuth() {
   const logout = async () => {
     try {
       // Call the logout API endpoint to clear the cookie server-side
-      await fetch('/api/auth/logout', {
+      await fetch('/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
@@ -42,11 +42,11 @@ export function useAuth() {
       
       // Update state and redirect
       setIsAuthenticated(false);
-      router.push('/login');
+      router.push('/auth/login');
     } catch (error) {
       console.error('Logout error:', error);
       // Still try to redirect even if there's an error
-      router.push('/login');
+      router.push('/auth/login');
     }
   };
 
