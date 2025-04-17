@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GlobeAltIcon } from '@heroicons/react/24/solid';
+import { GlobeAltIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/solid';
 import VirtualAssistant from './VirtualAssistant';
+import { useAuth } from '@/hooks/useAuth';
 
 // Supported languages for speech recognition
 export const SUPPORTED_LANGUAGES = [
@@ -31,6 +32,7 @@ const Navbar: React.FC<NavbarProps> = ({
   onLanguageChange 
 }) => {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const { logout } = useAuth();
 
   return (
     <motion.div 
@@ -49,55 +51,61 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right side - Status and Language Selector */}
+        {/* Right side - Language Selector and Logout */}
         <div className="flex items-center space-x-4">
           {/* Language Selector */}
           <div className="relative">
-            <motion.button
-              type="button"
+            <button
               onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-              className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 focus:outline-none"
             >
               <GlobeAltIcon className="h-5 w-5" />
-            </motion.button>
+              <span className="text-sm">
+                {SUPPORTED_LANGUAGES.find(lang => lang.code === selectedLanguage)?.name || 'Language'}
+              </span>
+            </button>
+
+            {/* Language Dropdown */}
             <AnimatePresence>
               {showLanguageMenu && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-                  style={{
-                    maxHeight: 'calc(100vh - 200px)',
-                    overflowY: 'auto'
-                  }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200"
                 >
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.code}
-                      onClick={() => {
-                        onLanguageChange(lang.code);
-                        setShowLanguageMenu(false);
-                      }}
-                      className={`w-full px-4 py-2 text-left hover:bg-gray-100 ${
-                        selectedLanguage === lang.code ? 'bg-blue-50 text-blue-600' : ''
-                      }`}
-                    >
-                      {lang.name}
-                    </button>
-                  ))}
+                  <div className="py-1">
+                    {SUPPORTED_LANGUAGES.map((language) => (
+                      <button
+                        key={language.code}
+                        onClick={() => {
+                          onLanguageChange(language.code);
+                          setShowLanguageMenu(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm ${
+                          selectedLanguage === language.code
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {language.name}
+                      </button>
+                    ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Status Indicator */}
-          <div className="flex items-center space-x-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-gray-600">Online</span>
-          </div>
+          {/* Logout Button */}
+          <button
+            onClick={logout}
+            className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 focus:outline-none"
+          >
+            <ArrowRightOnRectangleIcon className="h-5 w-5" />
+            <span className="text-sm">Logout</span>
+          </button>
         </div>
       </div>
     </motion.div>
