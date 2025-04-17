@@ -24,10 +24,35 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [assistantEmotion, setAssistantEmotion] = useState<'happy' | 'thinking' | 'listening' | 'neutral'>('neutral');
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Combined authentication and connection check
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = getAuthToken();
+        if (token) {
+          setIsAuthenticated(true);
+          await testConnection();
+        } else {
+          setIsAuthenticated(false);
+          setIsConnected(false);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
+        setIsConnected(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   const handleLogin = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -53,22 +78,6 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
       return false;
     }
   };
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = getAuthToken();
-      if (token) {
-        setIsAuthenticated(true);
-        // Test the connection with the token
-        await testConnection();
-      } else {
-        setIsAuthenticated(false);
-        setIsConnected(false);
-      }
-    };
-    
-    checkAuth();
-  }, []);
 
   const testConnection = async () => {
     try {
@@ -259,11 +268,20 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    console.log('Not authenticated');
     return <Login onLogin={handleLogin} />;
   }
-  console.log('default');
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">

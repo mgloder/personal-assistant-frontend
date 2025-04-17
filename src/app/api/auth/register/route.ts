@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { post, API } from '@/utils/api';
 
 export async function POST(request: Request) {
   try {
@@ -30,29 +31,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Forward the request to the backend
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password, username }),
-    });
+    // Use our API utility to make the request
+    const data = await post(API.auth.register, { email, password, username });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { message: data.detail || 'Registration failed' },
-        { status: response.status }
-      );
-    }
-
-    return NextResponse.json(data, { status: 201 });
-  } catch (error) {
+    return NextResponse.json(
+      { message: 'Registration successful' },
+      { status: 201 }
+    );
+  } catch (error: any) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: error.message || 'Registration failed' },
       { status: 500 }
     );
   }
