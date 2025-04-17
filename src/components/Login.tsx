@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }): React.ReactElement => {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,16 +21,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }): React.ReactElement => {
     setError(null);
 
     try {
-      console.log('Attempting login with email:', email);
       const success = await onLogin(email, password);
-      console.log('Login result:', success);
-      if (!success) {
+      if (success) {
+        // Redirect to the root page after successful login
+        router.push('/');
+      } else {
         setError('Invalid email or password. Please try again.');
       }
     } catch (err) {
-      console.error('Login error details:', {
-        error: err,
-      });
+      console.error('Login error details:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
