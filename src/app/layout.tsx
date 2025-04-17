@@ -1,8 +1,16 @@
+import React from 'react';
 import './globals.css';
 import { Inter } from 'next/font/google';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 const inter = Inter({ subsets: ['latin'] });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#4A90E2',
+};
 
 export const metadata: Metadata = {
   title: 'Little Dragon',
@@ -11,19 +19,13 @@ export const metadata: Metadata = {
   icons: {
     apple: '/icons/icon.svg',
   },
-  themeColor: '#4A90E2',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
 };
 
-export default function RootLayout({
-  children,
-}: {
+interface RootLayoutProps {
   children: React.ReactNode;
-}) {
+}
+
+export default function RootLayout({ children }: RootLayoutProps): React.ReactElement {
   return (
     <html lang="en">
       <head>

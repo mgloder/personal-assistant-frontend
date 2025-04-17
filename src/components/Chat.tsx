@@ -14,7 +14,9 @@ interface Message {
   timestamp: Date;
 }
 
-const Chat: React.FC = () => {
+interface ChatProps {}
+
+const Chat: React.FC<ChatProps> = (): React.ReactElement => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);

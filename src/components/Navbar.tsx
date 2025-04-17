@@ -30,15 +30,15 @@ const Navbar: React.FC<NavbarProps> = ({
   isListening, 
   selectedLanguage,
   onLanguageChange 
-}) => {
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+}): React.ReactElement => {
   const { logout } = useAuth();
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     try {
       await logout();
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('Logout error:', error);
     }
   };
 
@@ -64,7 +64,7 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Language Selector */}
           <div className="relative">
             <button
-              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+              onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
               className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 focus:outline-none"
             >
               <GlobeAltIcon className="h-5 w-5" />
@@ -75,7 +75,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
             {/* Language Dropdown */}
             <AnimatePresence>
-              {showLanguageMenu && (
+              {isLanguageMenuOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -89,7 +89,7 @@ const Navbar: React.FC<NavbarProps> = ({
                         key={language.code}
                         onClick={() => {
                           onLanguageChange(language.code);
-                          setShowLanguageMenu(false);
+                          setIsLanguageMenuOpen(false);
                         }}
                         className={`block w-full text-left px-4 py-2 text-sm ${
                           selectedLanguage === language.code

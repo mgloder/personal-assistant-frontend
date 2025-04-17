@@ -7,13 +7,13 @@ interface LoginProps {
   onLogin: (email: string, password: string) => Promise<boolean>;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin }): React.ReactElement => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
@@ -28,11 +28,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } catch (err) {
       console.error('Login error details:', {
         error: err,
-        errorMessage: err instanceof Error ? err.message : 'Unknown error',
-        errorStack: err instanceof Error ? err.stack : undefined,
-        timestamp: new Date().toISOString()
       });
-      setError('An error occurred during login. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }

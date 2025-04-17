@@ -25,11 +25,11 @@ const VirtualAssistant: React.FC<VirtualAssistantProps> = ({
   isListening = false,
   size = 'medium',
   emotion = 'neutral'
-}) => {
+}): React.ReactElement => {
   const sizeClasses = {
     small: 'w-12 h-12',
-    medium: 'w-16 h-16',
-    large: 'w-24 h-24'
+    medium: 'w-24 h-24',
+    large: 'w-32 h-32'
   };
 
   const containerVariants = {
