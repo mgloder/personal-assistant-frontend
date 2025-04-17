@@ -37,7 +37,7 @@ export function useAuth() {
       }
 
       // Call the logout API endpoint to blacklist the token
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch('/auth/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
