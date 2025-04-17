@@ -29,11 +29,25 @@ export function useAuth() {
   /**
    * Log out the current user
    */
-  const logout = () => {
-    // Remove the access token cookie
-    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    setIsAuthenticated(false);
-    router.push('/login');
+  const logout = async () => {
+    try {
+      // Call the logout API endpoint to clear the cookie server-side
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      // Also clear the cookie client-side as a fallback
+      document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      
+      // Update state and redirect
+      setIsAuthenticated(false);
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still try to redirect even if there's an error
+      router.push('/login');
+    }
   };
 
   return {

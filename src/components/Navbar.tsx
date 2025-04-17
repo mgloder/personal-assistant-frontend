@@ -34,6 +34,14 @@ const Navbar: React.FC<NavbarProps> = ({
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const { logout } = useAuth();
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
+
   return (
     <motion.div 
       className="w-full bg-white border-b border-gray-200"
@@ -100,7 +108,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
           {/* Logout Button */}
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="flex items-center space-x-1 text-gray-600 hover:text-gray-800 focus:outline-none"
           >
             <ArrowRightOnRectangleIcon className="h-5 w-5" />
