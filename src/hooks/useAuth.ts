@@ -57,6 +57,7 @@ export function useAuth() {
       // Update state and redirect to root page
       setIsAuthenticated(false);
       router.push('/');
+      router.refresh();
     } catch (error) {
       console.error('Logout error:', error);
       // Still try to clear local auth state and redirect even if the server call fails
@@ -64,6 +65,7 @@ export function useAuth() {
       localStorage.removeItem('access_token');
       setIsAuthenticated(false);
       router.push('/');
+      router.refresh();
     }
   };
 
