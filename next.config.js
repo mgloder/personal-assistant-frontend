@@ -3,32 +3,27 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   async rewrites() {
-    // Use localhost in development, backend service name in production
-    const backendUrl = process.env.NODE_ENV === 'production' 
-      ? 'http://backend:8005'
-      : 'http://localhost:8005';
-
     return {
       beforeFiles: [
         {
           source: '/api/:path*',
-          destination: `${backendUrl}/api/:path*`,
+          destination: 'http://backend:8005/api/:path*',
         },
         {
           source: '/auth/login',
-          destination: `${backendUrl}/auth/login`,
+          destination: 'http://backend:8005/auth/login',
         },
         {
           source: '/auth/:path*',
-          destination: `${backendUrl}/auth/:path*`,
+          destination: 'http://backend:8005/auth/:path*',
         },
         {
-          source: '/chat',
-          destination: `${backendUrl}/chat`,
+          source: '/api/chat',
+          destination: 'http://backend:8005/api/chat',
         },
         {
-          source: '/chat/:path*',
-          destination: `${backendUrl}/chat/:path*`,
+          source: '/api/chat/:path*',
+          destination: 'http://backend:8005/api/chat/:path*',
         },
       ]
     };

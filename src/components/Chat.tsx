@@ -37,7 +37,7 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
         const token = getAuthToken();
         if (token) {
           setIsAuthenticated(true);
-          await testConnection();
+          setIsConnected(true);
         } else {
           setIsAuthenticated(false);
           setIsConnected(false);
@@ -65,9 +65,7 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
         
         // Set authentication state
         setIsAuthenticated(true);
-        
-        // Test the connection with the new token
-        await testConnection();
+        setIsConnected(true);
         
         return true;
       }
@@ -76,30 +74,6 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     } catch (error) {
       console.error('Login error:', error);
       return false;
-    }
-  };
-
-  const testConnection = async () => {
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        setIsConnected(false);
-        return;
-      }
-
-      const response = await get<HealthResponse>(API.health);
-      
-      if (response) {
-        setIsConnected(true);
-        setError(null);
-      } else {
-        setIsConnected(false);
-        setError('Failed to connect to the server');
-      }
-    } catch (err) {
-      console.error('Connection test error:', err);
-      setIsConnected(false);
-      setError('Failed to connect to the server');
     }
   };
 
@@ -159,8 +133,12 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
           setError(null);
 
           // Send the message to the API
-          post<ChatResponse>(API.chat.send, {
-            message: userMessage
+          post<ChatResponse>(API.chat, {
+            message: {
+              content: userMessage.content,
+              role: userMessage.role,
+              timestamp: userMessage.timestamp
+            }
           })
           .then(response => {
             if (!response || !response.message) {
@@ -237,8 +215,12 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     setError(null);
 
     try {
-      const response = await post<ChatResponse>(API.chat.send, {
-        message: userMessage
+      const response = await post<ChatResponse>(API.chat, {
+        message: {
+          content: userMessage.content,
+          role: userMessage.role,
+          timestamp: userMessage.timestamp
+        }
       });
 
       if (!response || !response.message) {

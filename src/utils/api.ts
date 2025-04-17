@@ -3,10 +3,26 @@
  * Uses the native fetch API consistently across the application
  */
 
+// Base URL for API requests
+const BASE_URL = typeof window !== 'undefined' 
+  ? 'http://localhost:8005'  // Client-side
+  : 'http://backend:8005';   // Server-side
+
 // Default headers for all requests
 const defaultHeaders = {
   'Content-Type': 'application/json',
   'Accept': 'application/json',
+};
+
+// API endpoints
+export const API = {
+  auth: {
+    login: `${BASE_URL}/auth/login`,
+    register: `${BASE_URL}/auth/register`,
+    logout: `${BASE_URL}/auth/logout`,
+  },
+  chat: `${BASE_URL}/api/chat`,
+  health: `${BASE_URL}/api/health`,
 };
 
 // API response types
@@ -179,20 +195,4 @@ export const del = async <T>(endpoint: string, options: RequestInit = {}): Promi
   } catch (error) {
     throw new Error(handleApiError(error));
   }
-};
-
-/**
- * API endpoints
- */
-export const API = {
-  auth: {
-    login: '/api/auth/login',
-    register: '/api/auth/register',
-    logout: '/api/auth/logout',
-  },
-  chat: {
-    send: '/api/chat',
-    history: '/api/chat/history',
-  },
-  health: '/api/',
 }; 
