@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import VirtualAssistant from './VirtualAssistant';
 import Navbar from './Navbar';
 import Login from './Login';
-import { post, get, getAuthToken, API, LoginResponse, ChatResponse, HealthResponse } from '@/utils/api';
+import { post, get, getAuthToken, API, LoginResponse, ChatResponse, HealthResponse, stream } from '@/utils/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -214,8 +214,23 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     setAssistantEmotion('thinking');
     setError(null);
 
+    // Create a placeholder message for the assistant's response
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date()
+    };
+    
+    // Add the assistant message to the messages array
+    setMessages(prev => [...prev, assistantMessage]);
+    
+    // Store the index of the assistant message
+    const assistantMessageIndex = messages.length + 1;
+    let accumulatedContent = '';
+
     try {
-      const response = await post<ChatResponse>(API.chat, {
+      // Use the streaming API
+      const responseStream = await stream(API.chat, {
         message: {
           content: userMessage.content,
           role: userMessage.role,
@@ -223,26 +238,59 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
         }
       });
 
-      if (!response || !response.message) {
-        throw new Error('Invalid response format from server');
+      // Create a reader for the stream
+      const reader = responseStream.getReader();
+
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+        
+        // Convert the chunk to text
+        const chunk = new TextDecoder().decode(value);
+        
+        // Process Server-Sent Events (SSE)
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.substring(6);
+            accumulatedContent += data;
+            
+            // Update the assistant's message with the accumulated content
+            setMessages(prev => {
+              const newMessages = [...prev];
+              if (newMessages[assistantMessageIndex]) {
+                newMessages[assistantMessageIndex] = {
+                  ...newMessages[assistantMessageIndex],
+                  content: accumulatedContent
+                };
+              }
+              return newMessages;
+            });
+          }
+        }
       }
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: response.message,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
       setAssistantEmotion('happy');
     } catch (error: any) {
       console.error('Error details:', error);
       setError(error.message || 'Failed to get response from assistant');
-      const errorMessageObj: Message = {
-        role: 'assistant',
-        content: error.message || 'Failed to get response from assistant',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessageObj]);
+      
+      // Update the assistant's message with the error
+      setMessages(prev => {
+        const newMessages = [...prev];
+        if (newMessages[assistantMessageIndex]) {
+          newMessages[assistantMessageIndex] = {
+            ...newMessages[assistantMessageIndex],
+            content: error.message || 'Failed to get response from assistant'
+          };
+        }
+        return newMessages;
+      });
+      
       setAssistantEmotion('neutral');
     } finally {
       setIsTyping(false);

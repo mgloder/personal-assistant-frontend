@@ -107,7 +107,8 @@ export const get = async <T>(endpoint: string, options: RequestInit = {}): Promi
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
     
     return await response.json();
@@ -139,6 +140,40 @@ export const post = async <T>(endpoint: string, data: any, options: RequestInit 
     }
     
     return await response.json();
+  } catch (error) {
+    throw new Error(handleApiError(error));
+  }
+};
+
+/**
+ * Make a streaming request
+ * Returns a ReadableStream that can be consumed by the caller
+ */
+export const stream = async (endpoint: string, data: any, options: RequestInit = {}): Promise<ReadableStream> => {
+  try {
+    const headers = addAuthHeaders({
+      ...defaultHeaders,
+      'Accept': 'text/event-stream',
+      ...options.headers,
+    });
+    
+    const response = await fetch(endpoint, {
+      ...options,
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+    
+    return response.body;
   } catch (error) {
     throw new Error(handleApiError(error));
   }
