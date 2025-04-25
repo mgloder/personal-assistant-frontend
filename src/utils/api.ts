@@ -165,8 +165,10 @@ export const stream = async (endpoint: string, data: any, options: RequestInit =
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      // For SSE responses, we need to handle errors differently
+      // Try to get the error message from the response text
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
     
     if (!response.body) {

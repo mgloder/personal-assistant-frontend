@@ -116,6 +116,9 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
+        // Clear the input field on error
+        setInput('');
+        finalTranscript = '';
       };
 
       recognition.onend = () => {
@@ -132,43 +135,119 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
           setAssistantEmotion('thinking');
           setError(null);
 
-          // Send the message to the API
-          post<ChatResponse>(API.chat, {
+          // Create a placeholder message for the assistant's response
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: '',
+            timestamp: new Date()
+          };
+          
+          // Add the assistant message to the messages array
+          setMessages(prev => [...prev, assistantMessage]);
+          
+          let accumulatedContent = '';
+
+          // Use the streaming API instead of post
+          stream(API.chat, {
             message: {
               content: userMessage.content,
               role: userMessage.role,
               timestamp: userMessage.timestamp
             }
           })
-          .then(response => {
-            if (!response || !response.message) {
-              throw new Error('Invalid response format from server');
-            }
+          .then(responseStream => {
+            // Create a reader for the stream
+            const reader = responseStream.getReader();
 
-            const assistantMessage: Message = {
-              role: 'assistant',
-              content: response.message,
-              timestamp: new Date()
+            // Process the stream
+            const processStream = async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  
+                  if (done) {
+                    break;
+                  }
+                  
+                  // Convert the chunk to text
+                  const chunk = new TextDecoder().decode(value);
+                  console.log('Received chunk (voice):', chunk); // Debug log
+                  
+                  // Process Server-Sent Events (SSE)
+                  const lines = chunk.split('\n');
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        // Parse the SSE data
+                        const data = parseSSEData(line);
+                        console.log('Parsed data (voice):', data); // Debug log
+                        
+                        // Add the data to the accumulated content
+                        accumulatedContent += data;
+                        
+                        // Update the assistant's message with the accumulated content
+                        setMessages(prev => {
+                          const newMessages = [...prev];
+                          // Use the last message as the assistant's message
+                          const lastIndex = newMessages.length - 1;
+                          if (lastIndex >= 0) {
+                            newMessages[lastIndex] = {
+                              ...newMessages[lastIndex],
+                              content: accumulatedContent
+                            };
+                          }
+                          return newMessages;
+                        });
+                      } catch (parseError) {
+                        console.error('Error parsing SSE data:', parseError);
+                        // Continue processing other lines even if one fails
+                      }
+                    }
+                  }
+                }
+
+                setAssistantEmotion('happy');
+              } catch (error: any) {
+                console.error('Error details:', error);
+                setError(error.message || 'Failed to get response from assistant');
+                
+                // Update the assistant's message with the error
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastIndex = newMessages.length - 1;
+                  if (lastIndex >= 0) {
+                    newMessages[lastIndex] = {
+                      ...newMessages[lastIndex],
+                      content: error.message || 'Failed to get response from assistant'
+                    };
+                  }
+                  return newMessages;
+                });
+                
+                setAssistantEmotion('neutral');
+              } finally {
+                setIsTyping(false);
+                setTimeout(() => setAssistantEmotion('neutral'), 2000);
+                // Clear the final transcript after processing
+                finalTranscript = '';
+              }
             };
-            setMessages(prev => [...prev, assistantMessage]);
-            setAssistantEmotion('happy');
+
+            processStream();
           })
           .catch(error => {
             console.error('Error details:', error);
             setError(error.message || 'Failed to get response from assistant');
-            const errorMessageObj: Message = {
-              role: 'assistant',
-              content: error.message || 'Failed to get response from assistant',
-              timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMessageObj]);
             setAssistantEmotion('neutral');
-          })
-          .finally(() => {
             setIsTyping(false);
             setTimeout(() => setAssistantEmotion('neutral'), 2000);
-            finalTranscript = ''; // Clear the final transcript after sending
+            // Clear the final transcript on error
+            finalTranscript = '';
           });
+        } else {
+          // Clear the input field if no final transcript
+          setInput('');
+          finalTranscript = '';
         }
       };
     }
@@ -177,7 +256,8 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
   const startRecording = () => {
     const recognition = recognitionRef.current;
     if (recognition) {
-      setInput(''); // Clear any previous input
+      // Clear the input field before starting a new recording
+      setInput('');
       recognition.start();
       setIsRecording(true);
     }
@@ -189,6 +269,24 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
       recognition.stop();
       setIsRecording(false);
     }
+  };
+
+  // Add this function to properly parse SSE data
+  const parseSSEData = (line: string): string => {
+    // Remove the 'data: ' prefix
+    if (line.startsWith('data: ')) {
+      const data = line.substring(6);
+      // Check if the data is JSON
+      try {
+        // If it's JSON, parse it and return the message property
+        const jsonData = JSON.parse(data);
+        return jsonData.message || jsonData.content || data;
+      } catch (e) {
+        // If it's not JSON, return the raw data
+        return data;
+      }
+    }
+    return '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -221,11 +319,13 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
       timestamp: new Date()
     };
     
-    // Add the assistant message to the messages array
-    setMessages(prev => [...prev, assistantMessage]);
+    // Add the assistant message to the messages array and get the current length
+    let assistantMessageIndex: number;
+    setMessages(prev => {
+      assistantMessageIndex = prev.length; // This is the index of the new message
+      return [...prev, assistantMessage];
+    });
     
-    // Store the index of the assistant message
-    const assistantMessageIndex = messages.length + 1;
     let accumulatedContent = '';
 
     try {
@@ -251,25 +351,37 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
         
         // Convert the chunk to text
         const chunk = new TextDecoder().decode(value);
+        console.log('Received chunk:', chunk); // Debug log
         
         // Process Server-Sent Events (SSE)
         const lines = chunk.split('\n');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.substring(6);
-            accumulatedContent += data;
-            
-            // Update the assistant's message with the accumulated content
-            setMessages(prev => {
-              const newMessages = [...prev];
-              if (newMessages[assistantMessageIndex]) {
-                newMessages[assistantMessageIndex] = {
-                  ...newMessages[assistantMessageIndex],
-                  content: accumulatedContent
-                };
-              }
-              return newMessages;
-            });
+            try {
+              // Parse the SSE data
+              const data = parseSSEData(line);
+              console.log('Parsed data:', data); // Debug log
+              
+              // Add the data to the accumulated content
+              accumulatedContent += data;
+              
+              // Update the assistant's message with the accumulated content
+              setMessages(prev => {
+                const newMessages = [...prev];
+                // Use the last message as the assistant's message
+                const lastIndex = newMessages.length - 1;
+                if (lastIndex >= 0) {
+                  newMessages[lastIndex] = {
+                    ...newMessages[lastIndex],
+                    content: accumulatedContent
+                  };
+                }
+                return newMessages;
+              });
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError);
+              // Continue processing other lines even if one fails
+            }
           }
         }
       }
@@ -282,9 +394,10 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
       // Update the assistant's message with the error
       setMessages(prev => {
         const newMessages = [...prev];
-        if (newMessages[assistantMessageIndex]) {
-          newMessages[assistantMessageIndex] = {
-            ...newMessages[assistantMessageIndex],
+        const lastIndex = newMessages.length - 1;
+        if (lastIndex >= 0) {
+          newMessages[lastIndex] = {
+            ...newMessages[lastIndex],
             content: error.message || 'Failed to get response from assistant'
           };
         }
