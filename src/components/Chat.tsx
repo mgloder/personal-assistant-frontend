@@ -3,6 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MicrophoneIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import VirtualAssistant from './VirtualAssistant';
 import Navbar from './Navbar';
 import Login from './Login';
@@ -411,6 +415,25 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
     }
   };
 
+  // Add this component for rendering code blocks
+  const CodeBlock = ({ language, value }: { language: string; value: string }) => {
+    return (
+      <div className="my-2 rounded-md overflow-hidden">
+        <SyntaxHighlighter
+          language={language || 'text'}
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            borderRadius: '0.375rem',
+            fontSize: '0.875rem',
+          }}
+        >
+          {value}
+        </SyntaxHighlighter>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -487,7 +510,71 @@ const Chat: React.FC<ChatProps> = (): React.ReactElement => {
                         ? 'bg-red-100 text-red-800'
                         : 'bg-white text-gray-800 shadow-sm'
                     }`}>
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'user' ? (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      ) : (
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              code: ({ node, inline, className, children, ...props }: any) => {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return !inline && match ? (
+                                  <CodeBlock
+                                    language={match[1]}
+                                    value={String(children).replace(/\n$/, '')}
+                                  />
+                                ) : (
+                                  <code className="bg-gray-100 dark:bg-gray-800 rounded px-1 py-0.5 text-sm" {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              },
+                              p: ({ children }) => <p className="text-sm whitespace-pre-wrap">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc pl-4 my-1">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-4 my-1">{children}</ol>,
+                              li: ({ children }) => <li className="my-0.5">{children}</li>,
+                              h1: ({ children }) => <h1 className="text-xl font-bold my-2">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-lg font-bold my-1.5">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-base font-bold my-1">{children}</h3>,
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-gray-300 pl-4 italic my-2">
+                                  {children}
+                                </blockquote>
+                              ),
+                              a: ({ href, children }) => (
+                                <a 
+                                  href={href} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:underline"
+                                >
+                                  {children}
+                                </a>
+                              ),
+                              table: ({ children }) => (
+                                <div className="overflow-x-auto my-2">
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    {children}
+                                  </table>
+                                </div>
+                              ),
+                              th: ({ children }) => (
+                                <th className="px-3 py-2 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  {children}
+                                </th>
+                              ),
+                              td: ({ children }) => (
+                                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                                  {children}
+                                </td>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                       <span className="text-xs opacity-70 mt-1 block">
                         {message.timestamp.toLocaleTimeString()}
                       </span>
